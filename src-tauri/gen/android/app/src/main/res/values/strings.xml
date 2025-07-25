@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">flappy_bird</string>
+    <string name="main_activity_title">flappy_bird</string>
+</resources>

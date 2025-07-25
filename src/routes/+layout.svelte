@@ -1,7 +1,9 @@
 <script lang="ts">
-	import '../app.css';
+    import "../app.css"
 
-	let { children } = $props();
+    let { children } = $props()
 </script>
 
-{@render children()}
+<div class="w-screen h-screen overflow-hidden bg-blue-400 relative">
+    {@render children()}
+</div>
