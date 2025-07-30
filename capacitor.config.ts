@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.flappy.bird.app',
-  appName: 'flappy_bird',
+  appId: 'com.brawltracker.app',
+  appName: 'BrawlTracker',
   webDir: 'dist'
 };
 

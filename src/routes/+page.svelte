@@ -1,95 +1,75 @@
-<script>
-  import Button from "$lib/Button.svelte";
-  import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
-  import { cubicOut } from 'svelte/easing';
-  import { fly } from 'svelte/transition';
-  import { coins, max_score, skin_in_use, background_in_use, settings } from '../stores/localstorage';
+<script lang="ts">
+  import { player, loading, error, loadPlayer } from "../lib/stores/player";
+  import type { Brawler } from "../lib/types";
 
-  // Numero di nuvole
-  const cloudCount = (Math.random() * 10)+1;
+  let inputTag = "#2G22CL280"; // valore iniziale per test
 
-  // Array di nuvole con posizioni e velocità random
-  const clouds = Array.from({ length: cloudCount }, () => ({
-    top: Math.random() * 80 + 10, // top in %, tra 10% e 90%
-    duration: 8 + Math.random() * 6, // durata animazione tra 8s e 14s
-    delay: Math.random() * -14, // delay negativo per animazioni sfalsate
-  }));
-
-  let loaded = false;
-  let transitioning = false;
-
-  onMount(() => {
-    loaded = true;
-  });
-
-  function goToStore() {
-    transitioning = true;
-    setTimeout(() => {
-      goto('/store');
-    }, 900);
-  }
-  function goToInventory() {
-    transitioning = true;
-    setTimeout(() => {
-      goto('/inventory');
-    }, 900);
-  }
-  function goToGame() {
-    transitioning = true;
-    setTimeout(() => {
-      goto('/game');
-    }, 900);
-  }
+  // utilità per ordinare i brawler per trofei
+  $: topBrawlers = $player
+    ? [...$player.brawlers].sort((a: Brawler, b: Brawler) => b.trophies - a.trophies).slice(0, 5)
+    : [];
 </script>
 
-{#if loaded}
-  <div transition:fly={{ y: 50, duration: 1500, easing: cubicOut }}>
-    <div class="relative overflow-hidden min-h-screen transition-discrete transition-transform duration-900 ease-in-out" class:translate-y-full={transitioning}>
-      {#each clouds as cloud (cloud)}
-        <img
-          src="Cloud-2.png"
-          alt="Nuvola"
-          class="animated-img scale-[2] z-0"
-          style="
-            top: {cloud.top}%;
-            animation-duration: {cloud.duration}s;
-            animation-delay: {cloud.delay}s;
-          "
-        />
-      {/each}
-      <div class="fixed top-[3%] left-[1%] flex items-center space-x-7 p-2">
-        <div class="font-pixelify text-white text-3xl text-border">COINS: {$coins}</div>
-        <img src="/coin.gif" alt="moneta" class="  scale-[200%]">
-      </div>
-      <div class="w-[50%] mx-auto flex flex-col items-center justify-center min-h-screen">
-        <h1 class="text-3xl text-border font-pixelify text-white fixed top-[4%]">Max Score: {$max_score}</h1>
-        <h1 class="text-8xl font-bold font-pixelify text-yellow-300 mb-[5%] text-shadow-lg/200 hover:scale-[120%] transition-transform duration-300 ease-in-out">Flappy Bird</h1>
-        <Button onclick={goToGame}>Play</Button>
-        <Button onclick={goToInventory}>Inventory</Button>
-        <Button onclick={goToStore}>Store</Button>
-        <h1 class="text-3xl text-border font-pixelify text-white fixed bottom-[4%]"><a target="_blank" href="https://i.pinimg.com/564x/48/c7/a7/48c7a7695d80385994eba0f3192d27af.jpg">By Andres & Alessandro</a></h1>
-      </div>
+<section>
+  <h1>Brawl Tracker</h1>
+
+  <form on:submit|preventDefault={() => loadPlayer(inputTag)}>
+    <input
+      placeholder="#TAG"
+      bind:value={inputTag}
+      aria-label="Inserisci tag"
+    />
+    <button disabled={$loading}>Cerca</button>
+  </form>
+
+  {#if $loading}
+    <p>Caricamento…</p>
+  {/if}
+
+  {#if $error}
+    <p style="color:red">{$error}</p>
+  {/if}
+
+  {#if $player}
+    <div class="card">
+      <h2>{ $player.name } <small>({ $player.tag })</small></h2>
+      <p><strong>Trofei:</strong> { $player.trophies } (max { $player.highestTrophies })</p>
+      {#if $player.club}
+        <p><strong>Club:</strong> { $player.club.name } ({ $player.club.tag })</p>
+      {/if}
+      <p><strong>Livello:</strong> { $player.expLevel } — <strong>XP:</strong> { $player.expPoints }</p>
+
+      {#if $player["3vs3Victories"] !== undefined}
+        <p><strong>3v3 vittorie:</strong> { $player["3vs3Victories"] }</p>
+      {/if}
+      <p><strong>Solo vittorie:</strong> { $player.soloVictories ?? 0 } — <strong>Duo vittorie:</strong> { $player.duoVictories ?? 0 }</p>
+
+      <h3>Top 5 Brawler per trofei</h3>
+      <ul>
+        {#each topBrawlers as b}
+          <li>
+            <strong>{b.name}</strong> — Trofei: {b.trophies} (max {b.highestTrophies}) — Power: {b.power} — Rank: {b.rank}
+            {#if b.gears?.length}
+              <div>Gears: {b.gears.map(g => `${g.name} ${g.level}`).join(", ")}</div>
+            {/if}
+            {#if b.starPowers?.length}
+              <div>Star Powers: {b.starPowers.map(s => s.name).join(", ")}</div>
+            {/if}
+            {#if b.gadgets?.length}
+              <div>Gadgets: {b.gadgets.map(g => g.name).join(", ")}</div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
     </div>
-  </div>  
-{/if}
+  {/if}
+</section>
 
 <style>
-  .animated-img {
-    position: absolute;
-    left: 0;
-    transform: translateY(-50%);
-    animation-name: slideRight;
-    animation-timing-function: linear;
-    animation-iteration-count: infinite;
-  }
-
-  @keyframes slideRight {
-    0% {
-      left: -110px;
-    }
-    100% {
-      left: 110vw;
-    }
-  }
+  section { max-width: 900px; margin: 0 auto; padding: 1rem; }
+  form { display: flex; gap: .5rem; margin-bottom: 1rem; }
+  input { flex: 1; padding: .5rem .75rem; }
+  button { padding: .5rem .75rem; }
+  .card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 1rem; }
+  ul { padding-left: 1.25rem; }
 </style>
