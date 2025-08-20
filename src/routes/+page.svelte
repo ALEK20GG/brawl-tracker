@@ -1,75 +1,205 @@
 <script lang="ts">
-  import { player, loading, error, loadPlayer } from "../lib/stores/player";
+  import { player, loading, error, loadPlayer, loadClub, loaded, club } from "../lib/stores/player";
   import type { Brawler } from "../lib/types";
+  import { updateIconsCapacitor } from "../lib/icon-updater";
+  import { getProfileIconSrc } from "$lib/profile-icon";
+  import {  getDeviceInfo } from "$lib/device-info";
+  import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
+  import { readFile } from "@tauri-apps/plugin-fs";
 
-  let inputTag = "#2G22CL280"; // valore iniziale per test
+
+  let playerTag = "";
+  let clubTag = "";
+  let iconSrc: string | null = null; // data uri o url pubblico
+
+  const deviceInfo: 'Android' | 'iOS' | 'macOS' | 'Windows' | 'Linux' | 'Unknown' = getDeviceInfo();
+
+  function set_loaded(to: string){
+    loaded.set(to);
+  }
 
   // utilità per ordinare i brawler per trofei
   $: topBrawlers = $player
     ? [...$player.brawlers].sort((a: Brawler, b: Brawler) => b.trophies - a.trophies).slice(0, 5)
     : [];
+  
+  function uint8ToBase64(bytes: Uint8Array): string {
+    // trasformazione robusta evitando apply con array grandi
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+    }
+    return btoa(binary);
+  }
+
+  async function getProfileIconsFolderTauri(): Promise<string | null> {
+    if (typeof window === "undefined" || !(window as any).__TAURI_IPC__) return null;
+    try {
+      const path: string = await invoke("get_profileicons_path");
+      return path;
+    } catch (e) {
+      console.warn("getProfileIconsFolderTauri:", e);
+      return null;
+    }
+  }
+
+  async function getIconBase64TauriByPath(fullPath: string): Promise<string | null> {
+  if (typeof window === "undefined" || !(window as any).__TAURI_IPC__) return null;
+  try {
+    const bytes: Uint8Array = await readFile(fullPath);
+    const b64 = uint8ToBase64(bytes);
+    return `data:image/png;base64,${b64}`;
+  } catch (e) {
+    console.warn("getIconBase64TauriByPath error:", e);
+    return null;
+  }
+}
+
+  // ---- Risolutore unico per la src dell'icona (Tauri / Capacitor / Web) ----
+  async function resolveIconSrc(iconId: number, fallbackUrl: string | null | undefined = undefined) {
+    iconSrc = null;
+
+    if (deviceInfo === 'Android' || deviceInfo === 'iOS') {
+      try {
+        iconSrc = await getProfileIconSrc(iconId, fallbackUrl ?? undefined);
+        return;
+      } catch (e) {
+        console.warn("Capacitor getProfileIconSrc failed:", e);
+      }
+    }
+
+    if (deviceInfo === 'macOS' || deviceInfo === 'Windows' || deviceInfo === 'Linux') {
+      try {
+        const folder = await getProfileIconsFolderTauri();
+        if (folder) {
+          const normalizedFolder = folder.replace(/[\\/]+$/, "");
+          const fullPath = `${normalizedFolder}/${iconId}.png`;
+          const base64 = await getIconBase64TauriByPath(fullPath);
+          iconSrc = base64;
+          return;
+        }
+      } catch (e) {
+        console.warn("Errore risolvendo icona Tauri:", e);
+      }
+    }
+
+    // fallback Web/CDN
+    iconSrc = fallbackUrl ?? `https://cdn.brawlify.com/profile-icons/regular/${iconId}.png`;
+  }
+
+  $: if ($player?.icon?.id) {
+    resolveIconSrc($player.icon.id, $player.iconUrl).catch(e => console.error(e));
+  }
+
+  onMount(async () => {
+    if (deviceInfo === 'Android' || deviceInfo === 'iOS') {
+      // Mobile
+      await updateIconsCapacitor();
+      console.log("✔️ Icone aggiornate su Capacitor");
+    } else {
+      // PC
+      console.log("🏁 Avvio su PC");
+    }
+  });
 </script>
 
-<section>
-  <h1>Brawl Tracker</h1>
-
-  <form on:submit|preventDefault={() => loadPlayer(inputTag)}>
-    <input
-      placeholder="#TAG"
-      bind:value={inputTag}
-      aria-label="Inserisci tag"
-    />
-    <button disabled={$loading}>Cerca</button>
-  </form>
-
-  {#if $loading}
-    <p>Caricamento…</p>
-  {/if}
-
-  {#if $error}
-    <p style="color:red">{$error}</p>
-  {/if}
-
-  {#if $player}
-    <div class="card">
-      <h2>{ $player.name } <small>({ $player.tag })</small></h2>
-      <p><strong>Trofei:</strong> { $player.trophies } (max { $player.highestTrophies })</p>
-      {#if $player.club}
-        <p><strong>Club:</strong> { $player.club.name } ({ $player.club.tag })</p>
-      {/if}
-      <p><strong>Livello:</strong> { $player.expLevel } — <strong>XP:</strong> { $player.expPoints }</p>
-
-      {#if $player["3vs3Victories"] !== undefined}
-        <p><strong>3v3 vittorie:</strong> { $player["3vs3Victories"] }</p>
-      {/if}
-      <p><strong>Solo vittorie:</strong> { $player.soloVictories ?? 0 } — <strong>Duo vittorie:</strong> { $player.duoVictories ?? 0 }</p>
-
-      <h3>Top 5 Brawler per trofei</h3>
-      <ul>
-        {#each topBrawlers as b}
-          <li>
-            <strong>{b.name}</strong> — Trofei: {b.trophies} (max {b.highestTrophies}) — Power: {b.power} — Rank: {b.rank}
-            {#if b.gears?.length}
-              <div>Gears: {b.gears.map(g => `${g.name} ${g.level}`).join(", ")}</div>
-            {/if}
-            {#if b.starPowers?.length}
-              <div>Star Powers: {b.starPowers.map(s => s.name).join(", ")}</div>
-            {/if}
-            {#if b.gadgets?.length}
-              <div>Gadgets: {b.gadgets.map(g => g.name).join(", ")}</div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
+<div class="text-purple-300 text-shadow-white overflow-hidden">
+  <header class="h-[7vh] justify-between flex bg-gray-900">
+    <img src="/logo.png" alt="logo" class="h-full object-contain" />
+    <img src="/brawl-tracker.png" alt="Brawl Tracker" class="h-full object-contain max-w-[60vw]" />
+    <button class="h-full min-w-[3rem] shrink-0 flex items-center justify-center">
+      <img src="/settings.png" alt="settings" class="h-full object-contain" />
+    </button>
+  </header>
+  <div class="overflow-y-auto overflow-x-hidden h-[86vh] bg-gradient-to-b from-gray-700 to-gray-800">
+    <div class="flex justify-around">
+      <p>Inserisci il tag del giocatore</p>
+      <p>Inserisci il tag del club</p>
     </div>
-  {/if}
-</section>
+    <div class="flex justify-around">
+      <form on:submit|preventDefault={() => { loadPlayer(playerTag); set_loaded('player'); }}>
+        <input placeholder="#TAG" bind:value={playerTag} aria-label="Inserisci tag" />
+        <button disabled={$loading}>Cerca</button>
+      </form>
+      <form on:submit|preventDefault={() => { loadClub(clubTag); set_loaded('club'); }}>
+        <input placeholder="#TAG" bind:value={clubTag} aria-label="Inserisci tag" />
+        <button disabled={$loading}>Cerca</button>
+      </form>
+    </div>
+
+    {#if $loading}
+      <p>Caricamento…</p>
+    {/if}
+
+    {#if $error}
+      <p style="color:red">{$error}</p>
+    {/if}
+
+    {#if $player && $loaded == 'player'}
+      <div class="max-h-[86vh] border border-gray-300 rounded-xl p-4">
+        <p>icon id: {$player.icon?.id}</p>
+        <p>icon base64: {iconSrc}</p>
+        <p>iconurl: {$player.iconUrl}</p>
+        {#if iconSrc}
+          <img src={iconSrc} alt="Icona di {$player.name}" class="w-16 h-16 rounded-full" />
+        {/if}
+        <h2>{ $player.name } <small>({ $player.tag })</small></h2>
+        <p><strong>Trofei:</strong> { $player.trophies } (max { $player.highestTrophies })</p>
+        {#if $player.club}
+          <p><strong>Club:</strong> { $player.club.name } ({ $player.club.tag })</p>
+        {/if}
+        <p><strong>Livello:</strong> { $player.expLevel } — <strong>XP:</strong> { $player.expPoints }</p>
+
+        {#if $player["3vs3Victories"] !== undefined}
+          <p><strong>3v3 vittorie:</strong> { $player["3vs3Victories"] }</p>
+        {/if}
+        <p><strong>Solo vittorie:</strong> { $player.soloVictories ?? 0 } — <strong>Duo vittorie:</strong> { $player.duoVictories ?? 0 }</p>
+
+        <h3>Top 5 Brawler per trofei</h3>
+        <ul>
+          {#each topBrawlers as b}
+            <li>
+              <strong>{b.name}</strong> — Trofei: {b.trophies} (max {b.highestTrophies}) — Power: {b.power} — Rank: {b.rank}
+              {#if b.gears?.length}
+                <div>Gears: {b.gears.map(g => `${g.name} ${g.level}`).join(", ")}</div>
+              {/if}
+              {#if b.starPowers?.length}
+                <div>Star Powers: {b.starPowers.map(s => s.name).join(", ")}</div>
+              {/if}
+              {#if b.gadgets?.length}
+                <div>Gadgets: {b.gadgets.map(g => g.name).join(", ")}</div>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+    {#if $club && $loaded == 'club'}
+      <div class="max-h-[86vh] border border-gray-300 rounded-xl p-4">
+        <p>{ $club.name } <small> ({ $club.tag })</small></p>
+        <p>descrizione: { $club.description }</p>
+        <p>trofei richiesti: { $club.requiredTrophies }</p>
+        <p>trofei totali: { $club.trophies }</p>
+        <p>tipo: { $club.type }</p>
+        {#each $club.members as m}
+          <p>nome: { m.name }</p>
+          <pre>    tag: { m.tag }</pre>
+          <pre>    ruolo: { m.role }</pre>
+          <pre>    trofei: { m.trophies }</pre>
+        {/each}
+      </div>
+    {/if}
+  </div>
+  <footer class="bg-gray-900 h-[7vh] text-center flex items-center justify-center">
+    <p>Created by Zanga Alessandro</p>
+  </footer>
+</div>
 
 <style>
-  section { max-width: 900px; margin: 0 auto; padding: 1rem; }
   form { display: flex; gap: .5rem; margin-bottom: 1rem; }
   input { flex: 1; padding: .5rem .75rem; }
   button { padding: .5rem .75rem; }
-  .card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 1rem; }
   ul { padding-left: 1.25rem; }
 </style>
