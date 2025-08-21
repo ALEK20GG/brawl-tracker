@@ -23,7 +23,8 @@
   $: topBrawlers = $player
     ? [...$player.brawlers].sort((a: Brawler, b: Brawler) => b.trophies - a.trophies).slice(0, 5)
     : [];
-  
+  $: playerClubTag = $player?.club?.tag || "";
+  $: clubMembersTags = $club?.members.map(m => m.tag) || [];
   function uint8ToBase64(bytes: Uint8Array): string {
     // trasformazione robusta evitando apply con array grandi
     let binary = "";
@@ -139,16 +140,19 @@
 
     {#if $player && $loaded == 'player'}
       <div class="max-h-[86vh] border border-gray-300 rounded-xl p-4">
-        <p>icon id: {$player.icon?.id}</p>
-        <p>icon base64: {iconSrc}</p>
-        <p>iconurl: {$player.iconUrl}</p>
         {#if iconSrc}
           <img src={iconSrc} alt="Icona di {$player.name}" class="w-16 h-16 rounded-full" />
         {/if}
-        <h2>{ $player.name } <small>({ $player.tag })</small></h2>
+        <h2>Nome: { $player.name }</h2>
+        <p>Tag: { $player.tag }</p>
         <p><strong>Trofei:</strong> { $player.trophies } (max { $player.highestTrophies })</p>
         {#if $player.club}
-          <p><strong>Club:</strong> { $player.club.name } ({ $player.club.tag })</p>
+          <p>
+            <strong>Club:</strong> { $player.club.name } 
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <small on:click={() => { loadClub(playerClubTag); set_loaded('club'); }}>({ $player.club.tag })</small>
+          </p>
         {/if}
         <p><strong>Livello:</strong> { $player.expLevel } — <strong>XP:</strong> { $player.expPoints }</p>
 
@@ -183,12 +187,16 @@
         <p>trofei richiesti: { $club.requiredTrophies }</p>
         <p>trofei totali: { $club.trophies }</p>
         <p>tipo: { $club.type }</p>
-        {#each $club.members as m}
-          <p>nome: { m.name }</p>
-          <pre>    tag: { m.tag }</pre>
-          <pre>    ruolo: { m.role }</pre>
-          <pre>    trofei: { m.trophies }</pre>
-        {/each}
+        <div>
+          {#each $club.members as m}
+            <p>nome: { m.name }</p>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <pre>    tag: <span style="cursor:pointer; color:#8b5cf6;" on:click={() => { loadPlayer(m.tag); set_loaded('player'); }}>{ m.tag }</span></pre>
+            <pre>    ruolo: { m.role }</pre>
+            <pre>    trofei: { m.trophies }</pre>
+          {/each}
+        </div>
       </div>
     {/if}
   </div>
