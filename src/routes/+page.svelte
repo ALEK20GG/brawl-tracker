@@ -9,7 +9,7 @@
   import { readFile } from "@tauri-apps/plugin-fs";
 
   //////////// EFFETTI PER I PUNTINI DI CARICAMENTO ////////////
-  let loadingMessage = "Stiamo accendendo il server";
+  let loadingMessage = "Stiamo accendendo il server ";
   let dots = "";
   let showServerMessage = true;
   let intervalId: any;
@@ -20,20 +20,20 @@
     if (showServerMessage) {
       let dotCount = 1;
       dots = ".";
-      loadingMessage = "Stiamo accendendo il server";
+      loadingMessage = "Stiamo accendendo il server ";
       clearInterval(intervalId);
       clearTimeout(timeoutId);
 
       intervalId = setInterval(() => {
         dotCount = dotCount < 3 ? dotCount + 1 : 1;
-        dots = ".".repeat(dotCount);
+        dots = ". ".repeat(dotCount);
       }, 1000);
 
       timeoutId = setTimeout(() => {
         showServerMessage = false;
         clearInterval(intervalId);
         dots = "";
-        loadingMessage = "Caricamento profilo…";
+        loadingMessage = "Caricamento dati . . .";
       }, 10000);
     }
   } else {
@@ -50,28 +50,27 @@
 
   let playerTag = "";
   let clubTag = "";
-  let iconSrc: string | null = null; // data uri o url pubblico
+  let iconSrc: string | null = null; // data uri
 
   const deviceInfo: 'Android' | 'iOS' | 'macOS' | 'Windows' | 'Linux' | 'Unknown' = getDeviceInfo();
-
-  function set_loaded(to: string){
-    loaded.set(to);
-  }
 
   // utilità per ordinare i brawler per trofei
   $: topBrawlers = $player
     ? [...$player.brawlers].sort((a: Brawler, b: Brawler) => b.trophies - a.trophies).slice(0, 5)
     : [];
   $: playerClubTag = $player?.club?.tag || "";
-  //$: clubMembersTags = $club?.members.map(m => m.tag) || [];
   function uint8ToBase64(bytes: Uint8Array): string {
-    // trasformazione robusta evitando apply con array grandi
+    // trasformazione icone profilo in base64
     let binary = "";
     const chunk = 0x8000;
     for (let i = 0; i < bytes.length; i += chunk) {
       binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
     }
     return btoa(binary);
+  }
+
+  function set_loaded(type: 'player' | 'club') {
+    loaded.set(type);
   }
 
   async function getProfileIconsFolderTauri(): Promise<string | null> {
@@ -86,16 +85,16 @@
   }
 
   async function getIconBase64TauriByPath(fullPath: string): Promise<string | null> {
-  if (typeof window === "undefined" || !(window as any).__TAURI_IPC__) return null;
-  try {
-    const bytes: Uint8Array = await readFile(fullPath);
-    const b64 = uint8ToBase64(bytes);
-    return `data:image/png;base64,${b64}`;
-  } catch (e) {
-    console.warn("getIconBase64TauriByPath error:", e);
-    return null;
+    if (typeof window === "undefined" || !(window as any).__TAURI_IPC__) return null;
+    try {
+      const bytes: Uint8Array = await readFile(fullPath);
+      const b64 = uint8ToBase64(bytes);
+      return `data:image/png;base64,${b64}`;
+    } catch (e) {
+      console.warn("getIconBase64TauriByPath error:", e);
+      return null;
+    }
   }
-}
 
   // ---- Risolutore unico per la src dell'icona (Tauri / Capacitor / Web) ----
   async function resolveIconSrc(iconId: number, fallbackUrl: string | null | undefined = undefined) {
@@ -204,28 +203,64 @@
     {/if}
 
     {#if $player && $playerBattlelog && $loaded == 'player'}
-      <div class="max-h-[86vh] border border-gray-300 rounded-xl p-4">
-        {#if iconSrc}
-          <img src={iconSrc} alt="Icona di {$player.name}" class="w-16 h-16 rounded-full" />
-        {/if}
-        <h2>Nome: { $player.name }</h2>
-        <p>Tag: { $player.tag }</p>
-        <p><strong>Trofei:</strong> { $player.trophies } (max { $player.highestTrophies })</p>
+      <div class="max-h-[10000vh] border border-gray-300 rounded-xl p-4">
+        <div class="flex flex-row gap-4 items-center mb-4">
+          {#if iconSrc}
+            <img src={iconSrc} alt="Icona di {$player.name}" class="w-24 h-24" />
+          {/if}
+          <div class="flex flex-col">
+            <h1 
+              style="color: #{$player.nameColor?.replace("0xff", "")};"
+              class="font-bold text-5xl text-shadow-black"
+            >
+              Profilo di { $player.name }
+            </h1>
+            <small>({ $player.tag })</small>
+          </div>
+        </div>
+        <div class="flex-row flex gap-2 items-center">
+          <img class="flex h-[16px] w-[16px]" src="/game-icons/trophy.png" alt="trofeo">
+          <pre>Trofei:                                { $player.trophies }</pre>
+        </div>
+        <div class="flex-row flex gap-2 items-center">
+          <img class="flex h-[16px] w-[16px]" src="/game-icons/Ranking.png" alt="ranking">
+          <pre>Trofei massimi:                        { $player.highestTrophies }</pre>
+        </div>
+        
         {#if $player.club}
-          <p>
-            <strong>Club:</strong> { $player.club.name } 
+          <div class="flex flex-row gap-2 items-center">
+            <img src="/game-icons/Club.png" alt="club" class="h-[16px] w-[16px]"/>
+            <pre>Club:                                  { $player.club.name }</pre> 
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <small on:click={() => { loadClub(playerClubTag); set_loaded('club'); }}>({ $player.club.tag })</small>
-          </p>
+            <span style="cursor:pointer; color:#8b5cf6;" on:click={() => { loadClub(playerClubTag); set_loaded('club'); }}>
+              ({ $player.club.tag })
+            </span>
+          </div>
         {/if}
-        <p><strong>Livello:</strong> { $player.expLevel } — <strong>XP:</strong> { $player.expPoints }</p>
+        <div class="flex flex-row gap-2 items-center">
+          <img src="/game-icons/Info.png" alt="info" class="h-[16px] w-[16px]"/>
+          <pre>Livello:                               { $player.expLevel }</pre>
+        </div>
+        <div class="flex flex-row gap-2 items-center">
+          <img src="/game-icons/Xp.png" alt="xp" class="h-[16px] w-[16px]"/>
+          <pre>Xp:                                    { $player.expPoints }</pre>
+        </div>
 
         {#if $player["3vs3Victories"] !== undefined}
-          <p><strong>3v3 vittorie:</strong> { $player["3vs3Victories"] }</p>
+          <div class="flex flex-row gap-2 items-center">
+            <img src="/game-icons/3v3.png" alt="3v3" class="h-[16px] w-[16px]"/>
+            <pre>Vittorie 3v3:                          { $player["3vs3Victories"] }</pre>
+          </div>
         {/if}
-        <p><strong>Solo vittorie:</strong> { $player.soloVictories ?? 0 } — <strong>Duo vittorie:</strong> { $player.duoVictories ?? 0 }</p>
-
+        <div class="flex flex-row gap-2 items-center">
+          <img src="/game-icons/Showdown.png" alt="solo showdown" class="h-[16px] w-[16px]"/>
+          <pre>Vittorie in sopravvivenza solo:        { $player.soloVictories ?? 0 }</pre>
+        </div>
+        <div class="flex flex-row gap-2 items-center">
+          <img src="/game-icons/Duo-Showdown.png" alt="duo showdown" class="h-[16px] w-[16px]"/>
+          <pre>Vittorie in sopravvivenza duo:         { $player.duoVictories ?? 0 }</pre>
+        </div>
         <h3>Top 5 Brawler per trofei</h3>
         <ul>
           {#each topBrawlers as b}
