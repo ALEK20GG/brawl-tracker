@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { player, loading, error, loadPlayer, loadClub, loaded, club } from "../lib/stores/player";
+  import { player, loading, error, loadPlayer, loadClub, loaded, club, playerBattlelog } from "../lib/stores/player";
   import type { Brawler } from "../lib/types";
   import { updateIconsCapacitor } from "../lib/icon-updater";
   import { getProfileIconSrc } from "$lib/profile-icon";
@@ -7,6 +7,45 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { readFile } from "@tauri-apps/plugin-fs";
+
+  //////////// EFFETTI PER I PUNTINI DI CARICAMENTO ////////////
+  let loadingMessage = "Stiamo accendendo il server";
+  let dots = "";
+  let showServerMessage = true;
+  let intervalId: any;
+  let timeoutId: any;
+
+  $: if ($loading) {
+    // Avvia animazione solo se loading è true
+    if (showServerMessage) {
+      let dotCount = 1;
+      dots = ".";
+      loadingMessage = "Stiamo accendendo il server";
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+
+      intervalId = setInterval(() => {
+        dotCount = dotCount < 3 ? dotCount + 1 : 1;
+        dots = ".".repeat(dotCount);
+      }, 1000);
+
+      timeoutId = setTimeout(() => {
+        showServerMessage = false;
+        clearInterval(intervalId);
+        dots = "";
+        loadingMessage = "Caricamento profilo…";
+      }, 10000);
+    }
+  } else {
+    // Reset quando loading diventa false
+    showServerMessage = true;
+    dots = "";
+    loadingMessage = "Stiamo accendendo il server";
+    clearInterval(intervalId);
+    clearTimeout(timeoutId);
+  }
+
+  ///////////////////////////////////////////////////////////////
 
 
   let playerTag = "";
@@ -24,7 +63,7 @@
     ? [...$player.brawlers].sort((a: Brawler, b: Brawler) => b.trophies - a.trophies).slice(0, 5)
     : [];
   $: playerClubTag = $player?.club?.tag || "";
-  $: clubMembersTags = $club?.members.map(m => m.tag) || [];
+  //$: clubMembersTags = $club?.members.map(m => m.tag) || [];
   function uint8ToBase64(bytes: Uint8Array): string {
     // trasformazione robusta evitando apply con array grandi
     let binary = "";
@@ -115,30 +154,56 @@
     </button>
   </header>
   <div class="overflow-y-auto overflow-x-hidden h-[86vh] bg-gradient-to-b from-gray-700 to-gray-800">
-    <div class="flex justify-around">
-      <p>Inserisci il tag del giocatore</p>
-      <p>Inserisci il tag del club</p>
-    </div>
-    <div class="flex justify-around">
-      <form on:submit|preventDefault={() => { loadPlayer(playerTag); set_loaded('player'); }}>
-        <input placeholder="#TAG" bind:value={playerTag} aria-label="Inserisci tag" />
-        <button disabled={$loading}>Cerca</button>
-      </form>
-      <form on:submit|preventDefault={() => { loadClub(clubTag); set_loaded('club'); }}>
-        <input placeholder="#TAG" bind:value={clubTag} aria-label="Inserisci tag" />
-        <button disabled={$loading}>Cerca</button>
-      </form>
-    </div>
-
-    {#if $loading}
-      <p>Caricamento…</p>
+    {#if !$loading}
+      {#if deviceInfo === 'Windows' || deviceInfo === 'macOS' || deviceInfo === 'Linux'}
+        <div class="flex justify-around">
+          <p>Inserisci il tag del giocatore</p>
+          <p>Inserisci il tag del club</p>
+        </div>
+        <div class="flex justify-around">
+          <form on:submit|preventDefault={() => { loadPlayer(playerTag); set_loaded('player'); }}>
+            <input placeholder="#TAG" bind:value={playerTag} aria-label="Inserisci tag" />
+            <button disabled={$loading}>Cerca</button>
+          </form>
+          <form on:submit|preventDefault={() => { loadClub(clubTag); set_loaded('club'); }}>
+            <input placeholder="#TAG" bind:value={clubTag} aria-label="Inserisci tag" />
+            <button disabled={$loading}>Cerca</button>
+          </form>
+        </div>
+      {:else}
+        <div class="flex flex-col justify-around items-center">
+          <p>Inserisci il tag del giocatore</p>
+          <form on:submit|preventDefault={() => { loadPlayer(playerTag); set_loaded('player'); }}>
+            <input  placeholder="#TAG" bind:value={playerTag} aria-label="Inserisci tag" />
+            <button disabled={$loading}>Cerca</button>
+          </form>
+          <p>Inserisci il tag del club</p>
+          <form on:submit|preventDefault={() => { loadClub(clubTag); set_loaded('club'); }}>
+            <input placeholder="#TAG" bind:value={clubTag} aria-label="Inserisci tag" />
+            <button disabled={$loading}>Cerca</button>
+          </form>
+        </div>
+      {/if}
     {/if}
 
-    {#if $error}
+    {#if $loading}
+      <div class="bg-gray-950/95 h-full w-full flex flex-col items-center justify-center">
+        <img src="/loading.gif" alt="caricamento" class="h-[25%]"/>
+        <p>{loadingMessage}{dots}</p>
+      </div>
+    {/if}
+
+    {#if $error === "Errore 404: Errore Brawl Stars: 404 Not Found"}
+      <div class="items-center justify-center flex flex-col">
+        <img src="/loading-failure.gif" alt="loading failure">
+        <p>CICCIO NON SAI SCRIVERE TORNA A SCUOLA 😉<small>(tag sbagliato)</small></p>
+      </div>
+    {/if}
+    {#if $error && $error !== "Errore 404: Errore Brawl Stars: 404 Not Found"}
       <p style="color:red">{$error}</p>
     {/if}
 
-    {#if $player && $loaded == 'player'}
+    {#if $player && $playerBattlelog && $loaded == 'player'}
       <div class="max-h-[86vh] border border-gray-300 rounded-xl p-4">
         {#if iconSrc}
           <img src={iconSrc} alt="Icona di {$player.name}" class="w-16 h-16 rounded-full" />
@@ -206,7 +271,7 @@
 </div>
 
 <style>
-  form { display: flex; gap: .5rem; margin-bottom: 1rem; }
+  form { display: flex; gap: .5rem;}
   input { flex: 1; padding: .5rem .75rem; }
   button { padding: .5rem .75rem; }
   ul { padding-left: 1.25rem; }
