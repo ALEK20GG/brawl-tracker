@@ -56,7 +56,7 @@
 
   // utilità per ordinare i brawler per trofei
   $: topBrawlers = $player
-    ? [...$player.brawlers].sort((a: Brawler, b: Brawler) => b.trophies - a.trophies).slice(0, 5)
+    ? [...$player.brawlers].sort((a: Brawler, b: Brawler) => b.trophies - a.trophies).slice(0, $player.brawlers.length)
     : [];
   $: playerClubTag = $player?.club?.tag || "";
   function uint8ToBase64(bytes: Uint8Array): string {
@@ -204,80 +204,99 @@
 
     {#if $player && $playerBattlelog && $loaded == 'player'}
       <div class="max-h-[10000vh] border border-gray-300 rounded-xl p-4">
-        <div class="flex flex-row gap-4 items-center mb-4">
+        <div class="flex flex-row gap-4 items-center mb-4 mt-4 ml-[7%] mr-[7%]">
           {#if iconSrc}
-            <img src={iconSrc} alt="Icona di {$player.name}" class="w-24 h-24" />
+            <img src={iconSrc} alt="Icona di {$player.name}" class="{ deviceInfo == "Android" || deviceInfo == "iOS" ? "w-20 h-20" : "w-24 h-24"}" />
           {/if}
           <div class="flex flex-col">
             <h1 
               style="color: #{$player.nameColor?.replace("0xff", "")};"
-              class="font-bold text-5xl text-shadow-black"
+              class="font-bold { deviceInfo == "Android" || deviceInfo == "iOS" ? "text-2xl" : "text-5xl"} text-shadow-black"
             >
               Profilo di { $player.name }
             </h1>
             <small>({ $player.tag })</small>
           </div>
         </div>
-        <div class="flex-row flex gap-2 items-center">
-          <img class="flex h-[16px] w-[16px]" src="/game-icons/trophy.png" alt="trofeo">
-          <pre>Trofei:                                { $player.trophies }</pre>
-        </div>
-        <div class="flex-row flex gap-2 items-center">
-          <img class="flex h-[16px] w-[16px]" src="/game-icons/Ranking.png" alt="ranking">
-          <pre>Trofei massimi:                        { $player.highestTrophies }</pre>
-        </div>
-        
-        {#if $player.club}
-          <div class="flex flex-row gap-2 items-center">
-            <img src="/game-icons/Club.png" alt="club" class="h-[16px] w-[16px]"/>
-            <pre>Club:                                  { $player.club.name }</pre> 
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <span style="cursor:pointer; color:#8b5cf6;" on:click={() => { loadClub(playerClubTag); set_loaded('club'); }}>
-              ({ $player.club.tag })
-            </span>
-          </div>
-        {/if}
-        <div class="flex flex-row gap-2 items-center">
-          <img src="/game-icons/Info.png" alt="info" class="h-[16px] w-[16px]"/>
-          <pre>Livello:                               { $player.expLevel }</pre>
-        </div>
-        <div class="flex flex-row gap-2 items-center">
-          <img src="/game-icons/Xp.png" alt="xp" class="h-[16px] w-[16px]"/>
-          <pre>Xp:                                    { $player.expPoints }</pre>
-        </div>
+        <div class="w-full items-center justify-evenly flex flex-row">
+          {#if deviceInfo === 'Windows' || deviceInfo === 'macOS' || deviceInfo === 'Linux'}
+            <img src="/decorations/shelly-stellare.png" alt="shelly stellare" class="h-[225px] w-auto mr-[33.5px] ml-[33.5px]"/>
+          {/if}
+          <div class=" w-fit max-h-[86vh] border border-gray-300 rounded-xl p-4 justify-center items-center mt-4 mb-4 overflow-y-auto">
+            <div class="flex-row flex gap-2 items-center">
+              <img class="flex h-[16px] w-[16px]" src="/game-icons/trophy.png" alt="trofeo">
+              <pre>Trofei:                                { $player.trophies }</pre>
+            </div>
+            <div class="flex-row flex gap-2 items-center">
+              <img class="flex h-[16px] w-[16px]" src="/game-icons/Ranking.png" alt="ranking">
+              <pre>Trofei massimi:                        { $player.highestTrophies }</pre>
+            </div>
+            
+            {#if $player.club}
+              <div class="flex flex-row gap-2 items-center">
+                <img src="/game-icons/Club.png" alt="club" class="h-[16px] w-[16px]"/>
+                <pre>Club:                                  { $player.club.name }</pre> 
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <span style="cursor:pointer; color:#8b5cf6;" on:click={() => { loadClub(playerClubTag); set_loaded('club'); }}>
+                  ({ $player.club.tag })
+                </span>
+              </div>
+            {/if}
+            <div class="flex flex-row gap-2 items-center">
+              <img src="/game-icons/Info.png" alt="info" class="h-[16px] w-[16px]"/>
+              <pre>Livello:                               { $player.expLevel }</pre>
+            </div>
+            <div class="flex flex-row gap-2 items-center">
+              <img src="/game-icons/Xp.png" alt="xp" class="h-[16px] w-[16px]"/>
+              <pre>Xp:                                    { $player.expPoints }</pre>
+            </div>
 
-        {#if $player["3vs3Victories"] !== undefined}
-          <div class="flex flex-row gap-2 items-center">
-            <img src="/game-icons/3v3.png" alt="3v3" class="h-[16px] w-[16px]"/>
-            <pre>Vittorie 3v3:                          { $player["3vs3Victories"] }</pre>
+            {#if $player["3vs3Victories"] !== undefined}
+              <div class="flex flex-row gap-2 items-center">
+                <img src="/game-icons/3v3.png" alt="3v3" class="h-[16px] w-[16px]"/>
+                <pre>Vittorie 3v3:                          { $player["3vs3Victories"] }</pre>
+              </div>
+            {/if}
+            <div class="flex flex-row gap-2 items-center">
+              <img src="/game-icons/Showdown.png" alt="solo showdown" class="h-[16px] w-[16px]"/>
+              <pre>Vittorie in sopravvivenza solo:        { $player.soloVictories ?? 0 }</pre>
+            </div>
+            <div class="flex flex-row gap-2 items-center">
+              <img src="/game-icons/Duo-Showdown.png" alt="duo showdown" class="h-[16px] w-[16px]"/>
+              <pre>Vittorie in sopravvivenza duo:         { $player.duoVictories ?? 0 }</pre>
+            </div>
           </div>
-        {/if}
-        <div class="flex flex-row gap-2 items-center">
-          <img src="/game-icons/Showdown.png" alt="solo showdown" class="h-[16px] w-[16px]"/>
-          <pre>Vittorie in sopravvivenza solo:        { $player.soloVictories ?? 0 }</pre>
+          {#if deviceInfo === 'Windows' || deviceInfo === 'macOS' || deviceInfo === 'Linux'}
+            <img src="/decorations/colt-challenger.png" alt="colt challenger" class="h-[225px] w-auto"/>
+          {/if}
+          
         </div>
-        <div class="flex flex-row gap-2 items-center">
-          <img src="/game-icons/Duo-Showdown.png" alt="duo showdown" class="h-[16px] w-[16px]"/>
-          <pre>Vittorie in sopravvivenza duo:         { $player.duoVictories ?? 0 }</pre>
+        <div class="w-[86%] ml-[7%] mr-[7%] border border-gray-300 rounded-xl">
+          <ul class="p-4">
+            {#each topBrawlers as b}
+              <button class="flex-row flex gap-2 items-center bg-gray-900/50 hover:bg-gray-900/100 rounded-lg p-1 w-full">
+                <pre>{b.name}      </pre>
+                <img src="/game-icons/trophy.png" alt="trofeo" class="h-[16px] w-[16px]">
+                <pre>{b.trophies}</pre>
+                <img src="/game-icons/Info.png" alt="power" class="h-[16px] w-[16px]">
+                <pre>{b.power}</pre>
+              </button>
+              <li>
+                <strong>{b.name}</strong> — Trofei: {b.trophies} (max {b.highestTrophies}) — Power: {b.power} — Rank: {b.rank}
+                {#if b.gears?.length}
+                  <div>Gears: {b.gears.map(g => `${g.name} ${g.level}`).join(", ")}</div>
+                {/if}
+                {#if b.starPowers?.length}
+                  <div>Star Powers: {b.starPowers.map(s => s.name).join(", ")}</div>
+                {/if}
+                {#if b.gadgets?.length}
+                  <div>Gadgets: {b.gadgets.map(g => g.name).join(", ")}</div>
+                {/if}
+              </li>
+            {/each}
+          </ul>
         </div>
-        <h3>Top 5 Brawler per trofei</h3>
-        <ul>
-          {#each topBrawlers as b}
-            <li>
-              <strong>{b.name}</strong> — Trofei: {b.trophies} (max {b.highestTrophies}) — Power: {b.power} — Rank: {b.rank}
-              {#if b.gears?.length}
-                <div>Gears: {b.gears.map(g => `${g.name} ${g.level}`).join(", ")}</div>
-              {/if}
-              {#if b.starPowers?.length}
-                <div>Star Powers: {b.starPowers.map(s => s.name).join(", ")}</div>
-              {/if}
-              {#if b.gadgets?.length}
-                <div>Gadgets: {b.gadgets.map(g => g.name).join(", ")}</div>
-              {/if}
-            </li>
-          {/each}
-        </ul>
       </div>
     {/if}
     {#if $club && $loaded == 'club'}
