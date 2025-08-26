@@ -55,9 +55,10 @@
   const deviceInfo: 'Android' | 'iOS' | 'macOS' | 'Windows' | 'Linux' | 'Unknown' = getDeviceInfo();
 
   // utilità per ordinare i brawler per trofei
-  $: topBrawlers = $player
+  $: Brawlers = $player
     ? [...$player.brawlers].sort((a: Brawler, b: Brawler) => b.trophies - a.trophies).slice(0, $player.brawlers.length)
     : [];
+  $: showedStats = Array(Brawlers.length).fill(false);
   $: playerClubTag = $player?.club?.tag || "";
   function uint8ToBase64(bytes: Uint8Array): string {
     // trasformazione icone profilo in base64
@@ -225,17 +226,17 @@
           <div class=" w-fit max-h-[86vh] border border-gray-300 rounded-xl p-4 justify-center items-center mt-4 mb-4 overflow-y-auto">
             <div class="flex-row flex gap-2 items-center">
               <img class="flex h-[16px] w-[16px]" src="/game-icons/trophy.png" alt="trofeo">
-              <pre>Trofei:                                { $player.trophies }</pre>
+              <pre>Trofei:             { $player.trophies }</pre>
             </div>
             <div class="flex-row flex gap-2 items-center">
               <img class="flex h-[16px] w-[16px]" src="/game-icons/Ranking.png" alt="ranking">
-              <pre>Trofei massimi:                        { $player.highestTrophies }</pre>
+              <pre>Trofei massimi:     { $player.highestTrophies }</pre>
             </div>
             
             {#if $player.club}
               <div class="flex flex-row gap-2 items-center">
                 <img src="/game-icons/Club.png" alt="club" class="h-[16px] w-[16px]"/>
-                <pre>Club:                                  { $player.club.name }</pre> 
+                <pre>Club:               { $player.club.name }</pre> 
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <span style="cursor:pointer; color:#8b5cf6;" on:click={() => { loadClub(playerClubTag); set_loaded('club'); }}>
@@ -245,26 +246,26 @@
             {/if}
             <div class="flex flex-row gap-2 items-center">
               <img src="/game-icons/Info.png" alt="info" class="h-[16px] w-[16px]"/>
-              <pre>Livello:                               { $player.expLevel }</pre>
+              <pre>Livello:            { $player.expLevel }</pre>
             </div>
             <div class="flex flex-row gap-2 items-center">
               <img src="/game-icons/Xp.png" alt="xp" class="h-[16px] w-[16px]"/>
-              <pre>Xp:                                    { $player.expPoints }</pre>
+              <pre>Xp:                 { $player.expPoints }</pre>
             </div>
 
             {#if $player["3vs3Victories"] !== undefined}
               <div class="flex flex-row gap-2 items-center">
                 <img src="/game-icons/3v3.png" alt="3v3" class="h-[16px] w-[16px]"/>
-                <pre>Vittorie 3v3:                          { $player["3vs3Victories"] }</pre>
+                <pre>Win 3v3:            { $player["3vs3Victories"] }</pre>
               </div>
             {/if}
             <div class="flex flex-row gap-2 items-center">
               <img src="/game-icons/Showdown.png" alt="solo showdown" class="h-[16px] w-[16px]"/>
-              <pre>Vittorie in sopravvivenza solo:        { $player.soloVictories ?? 0 }</pre>
+              <pre>Win solo sd:        { $player.soloVictories ?? 0 }</pre>
             </div>
             <div class="flex flex-row gap-2 items-center">
               <img src="/game-icons/Duo-Showdown.png" alt="duo showdown" class="h-[16px] w-[16px]"/>
-              <pre>Vittorie in sopravvivenza duo:         { $player.duoVictories ?? 0 }</pre>
+              <pre>Win duo sd:         { $player.duoVictories ?? 0 }</pre>
             </div>
           </div>
           {#if deviceInfo === 'Windows' || deviceInfo === 'macOS' || deviceInfo === 'Linux'}
@@ -274,26 +275,48 @@
         </div>
         <div class="w-[86%] ml-[7%] mr-[7%] border border-gray-300 rounded-xl">
           <ul class="p-4">
-            {#each topBrawlers as b}
-              <button class="flex-row flex gap-2 items-center bg-gray-900/50 hover:bg-gray-900/100 rounded-lg p-1 w-full">
-                <pre>{b.name}      </pre>
-                <img src="/game-icons/trophy.png" alt="trofeo" class="h-[16px] w-[16px]">
-                <pre>{b.trophies}</pre>
-                <img src="/game-icons/Info.png" alt="power" class="h-[16px] w-[16px]">
-                <pre>{b.power}</pre>
-              </button>
-              <li>
-                <strong>{b.name}</strong> — Trofei: {b.trophies} (max {b.highestTrophies}) — Power: {b.power} — Rank: {b.rank}
-                {#if b.gears?.length}
-                  <div>Gears: {b.gears.map(g => `${g.name} ${g.level}`).join(", ")}</div>
-                {/if}
-                {#if b.starPowers?.length}
-                  <div>Star Powers: {b.starPowers.map(s => s.name).join(", ")}</div>
-                {/if}
-                {#if b.gadgets?.length}
-                  <div>Gadgets: {b.gadgets.map(g => g.name).join(", ")}</div>
-                {/if}
-              </li>
+            {#each Brawlers as b}
+              {#if deviceInfo === 'Windows' || deviceInfo === 'macOS' || deviceInfo === 'Linux'}
+                <button 
+                  class="flex-row mb-1 mt-1 flex gap-2 items-center justify-between bg-gray-900/50 hover:bg-gray-900/100 rounded-lg p-1 w-full"
+                  on:click={() => { showedStats[Brawlers.indexOf(b)] = !showedStats[Brawlers.indexOf(b)]; }}
+                >
+                  <p>{b.name}</p>
+                  <div class="flex flex-row gap-1 items-center">
+                    <img src="/game-icons/trophy.png" alt="trofeo" class="h-[16px] w-[16px]">
+                    <p>{b.trophies}</p>
+                  </div>
+                  <div class="flex flex-row gap-1 items-center">
+                    <img src="/game-icons/Info.png" alt="info" class="h-[16px] w-[16px]">
+                    <p>Power: {b.power}</p>
+                  </div>
+                </button>
+              {:else}
+                <button class="flex-row flex gap-2 items-center justify-between bg-gray-900/50 hover:bg-gray-900/100 rounded-lg p-1 w-full">
+                  <p>{b.name}    </p>
+                  <div class="flex flex-row gap-1 items-center">
+                    <img src="/game-icons/trophy.png" alt="trofeo" class="h-[16px] w-[16px]">
+                    <p>{b.trophies}</p>
+                  </div>
+                </button>
+              {/if}
+              {#if showedStats[Brawlers.indexOf(b)]}
+                <li class="bg-gray-800/50 rounded-lg p-2">
+                  <p>Massimo: {b.highestTrophies}</p>
+                  <p>Power: {b.power}</p>
+                  <p>Rank: {b.rank}</p>
+                  {#if b.gears?.length}
+                    <div>Gears: {b.gears.map(g => `${g.name} ${g.level}`).join(", ")}</div>
+                  {/if}
+                  {#if b.starPowers?.length}
+                    <div>Star Powers: {b.starPowers.map(s => s.name).join(", ")}</div>
+                  {/if}
+                  {#if b.gadgets?.length}
+                    <div>Gadgets: {b.gadgets.map(g => g.name).join(", ")}</div>
+                  {/if}
+                </li>
+                
+              {/if}
             {/each}
           </ul>
         </div>
