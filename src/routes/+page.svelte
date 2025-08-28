@@ -60,6 +60,117 @@
     : [];
   $: showedStats = Array(Brawlers.length).fill(false);
   $: playerClubTag = $player?.club?.tag || "";
+  $: coinsToMax = 0;
+  $: powerpointsToMax = 0;
+  $: coinsToBuild = 0;
+  $: coinsToFullMax = 0;
+  $: if (Brawlers.length) { // calcolo monete per buildare tutti i brawler
+    coinsToBuild = 0;
+    Brawlers.forEach(b => {
+      coinsToBuild += calculateCoinsToBuildBrawler(b);
+    });
+  }
+  $: if (Brawlers.length) { // calcolo monete per portare tutti i brawler a full max
+    coinsToFullMax = 0;
+    Brawlers.forEach(b => {
+      coinsToFullMax += calculateCoinsToFullMaxBrawler(b);
+    });
+  }
+  $: if (Brawlers.length) { // calcolo monete e punti energia per portare tutti i brawler a max
+    coinsToMax = 0;
+    powerpointsToMax = 0;
+    Brawlers.forEach(b => {
+      coinsToMax += calculateCoinsToMaxBrawler(b);
+      powerpointsToMax += calculatePowerpointsToMaxBrawler(b);
+    });
+  }
+  function calculateCoinsToMaxBrawler(brawler: Brawler): number {
+    const powerLevelCoinsCosts = [20, 35, 75, 140, 290, 480, 800, 1250, 1875, 2800, 0];
+    let totalCoinCost = 0;
+
+    for (let level = brawler.power; level <= 11; level++) {
+      totalCoinCost += powerLevelCoinsCosts[level - 1];
+    }
+    return totalCoinCost;
+  }
+
+  function calculatePowerpointsToMaxBrawler(brawler: Brawler): number {
+    const powerLevelPwerpointsCost = [20, 30, 50, 80, 130, 210, 340, 550, 890, 1440, 0];
+    let totalPowerpointsCost = 0;
+
+    for (let level = brawler.power; level <= 11; level++) {
+      totalPowerpointsCost += powerLevelPwerpointsCost[level - 1];
+    }
+    return totalPowerpointsCost;
+  }
+
+  function calculateCoinsToBuildBrawler(brawler: Brawler): number {
+    const powerLevelPwerpointsCost = [20, 35, 75, 140, 290, 480, 800, 1250, 1875, 2800, 0];
+    const gadgetsCost = 1000;
+    const starPowersCost = 2000;
+    const gearsCost = 1000;
+    let totalCoinsCost = 0;
+
+    for (let level = brawler.power; level <= 11; level++) {
+      totalCoinsCost += powerLevelPwerpointsCost[level - 1];
+      if (brawler.gadgets?.length == 0)
+        totalCoinsCost += gadgetsCost;
+      if (brawler.starPowers?.length == 0)
+        totalCoinsCost += starPowersCost;
+      if (brawler.gears?.length == 0)
+        totalCoinsCost += gearsCost;
+      else if (brawler.gears?.length == 1)
+        totalCoinsCost += gearsCost;
+    }
+    return totalCoinsCost;
+  }
+
+  function calculateCoinsToFullMaxBrawler(brawler: Brawler): number {
+    const powerLevelPwerpointsCost = [20, 35, 75, 140, 290, 480, 800, 1250, 1875, 2800, 0];
+    const gadgetsCost = 1000;
+    const starPowersCost = 2000;
+    const gearsCost = 1000;
+    let totalCoinsCost = 0;
+
+    for (let level = brawler.power; level <= 11; level++) {
+      totalCoinsCost += powerLevelPwerpointsCost[level - 1];
+    }
+    switch (brawler.gadgets?.length) {
+      case 0:
+        totalCoinsCost += gadgetsCost*2;
+        break;
+      case 1:
+        totalCoinsCost += gadgetsCost;
+        break;
+    }
+    switch (brawler.starPowers?.length) {
+      case 0:
+        totalCoinsCost += starPowersCost*2;
+        break;
+      case 1:
+        totalCoinsCost += starPowersCost;
+        break;
+    }
+    switch (brawler.gears?.length) {
+      case 0:
+        totalCoinsCost += gearsCost*5;
+        break;
+      case 1:
+        totalCoinsCost += gearsCost*4;
+        break;
+      case 2:
+        totalCoinsCost += gearsCost*3;
+        break;
+      case 3:
+        totalCoinsCost += gearsCost*2;
+        break;
+      case 4:
+        totalCoinsCost += gearsCost;
+        break;
+    }
+    return totalCoinsCost;
+}
+
   function uint8ToBase64(bytes: Uint8Array): string {
     // trasformazione icone profilo in base64
     let binary = "";
@@ -154,7 +265,7 @@
     </button>
   </header>
   <div class="overflow-y-auto overflow-x-hidden h-[86vh] bg-gradient-to-b from-gray-700 to-gray-800">
-    {#if !$loading}
+    {#if !$loading} <!-- input tag se non sta caricando server o dati profilo-->
       {#if deviceInfo === 'Windows' || deviceInfo === 'macOS' || deviceInfo === 'Linux'}
         <div class="flex justify-around">
           <p>Inserisci il tag del giocatore</p>
@@ -186,24 +297,24 @@
       {/if}
     {/if}
 
-    {#if $loading}
+    {#if $loading} <!-- schermata di caricamento sever e dati)-->
       <div class="bg-gray-950/95 h-full w-full flex flex-col items-center justify-center">
         <img src="/loading.gif" alt="caricamento" class="h-[25%]"/>
         <p>{loadingMessage}{dots}</p>
       </div>
     {/if}
 
-    {#if $error === "Errore 404: Errore Brawl Stars: 404 Not Found"}
+    {#if $error === "Errore 404: Errore Brawl Stars: 404 Not Found"} <!-- schermata di errore tag non trovato -->
       <div class="items-center justify-center flex flex-col">
         <img src="/loading-failure.gif" alt="loading failure">
         <p>CICCIO NON SAI SCRIVERE TORNA A SCUOLA 😉<small>(tag sbagliato)</small></p>
       </div>
     {/if}
-    {#if $error && $error !== "Errore 404: Errore Brawl Stars: 404 Not Found"}
+    {#if $error && $error !== "Errore 404: Errore Brawl Stars: 404 Not Found"} <!-- schermata di errore generico -->
       <p style="color:red">{$error}</p>
     {/if}
 
-    {#if $player && $playerBattlelog && $loaded == 'player'}
+    {#if $player && $playerBattlelog && $loaded == 'player'} <!-- profilo giocatore + battlelog -->
       <div class="max-h-[10000vh] border border-gray-300 rounded-xl p-4">
         <div class="flex flex-row gap-4 items-center mb-4 mt-4 ml-[7%] mr-[7%]">
           {#if iconSrc}
@@ -226,17 +337,17 @@
           <div class=" w-fit max-h-[86vh] border border-gray-300 rounded-xl p-4 justify-center items-center mt-4 mb-4 overflow-y-auto">
             <div class="flex-row flex gap-2 items-center">
               <img class="flex h-[16px] w-[16px]" src="/game-icons/trophy.png" alt="trofeo">
-              <pre>Trofei:             { $player.trophies }</pre>
+              <pre>Trofei:              { $player.trophies }</pre>
             </div>
             <div class="flex-row flex gap-2 items-center">
               <img class="flex h-[16px] w-[16px]" src="/game-icons/Ranking.png" alt="ranking">
-              <pre>Trofei massimi:     { $player.highestTrophies }</pre>
+              <pre>Trofei massimi:      { $player.highestTrophies }</pre>
             </div>
             
             {#if $player.club}
               <div class="flex flex-row gap-2 items-center">
                 <img src="/game-icons/Club.png" alt="club" class="h-[16px] w-[16px]"/>
-                <pre>Club:               { $player.club.name }</pre> 
+                <pre>Club:                { $player.club.name }</pre> 
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <span style="cursor:pointer; color:#8b5cf6;" on:click={() => { loadClub(playerClubTag); set_loaded('club'); }}>
@@ -246,34 +357,42 @@
             {/if}
             <div class="flex flex-row gap-2 items-center">
               <img src="/game-icons/Info.png" alt="info" class="h-[16px] w-[16px]"/>
-              <pre>Livello:            { $player.expLevel }</pre>
+              <pre>Livello:             { $player.expLevel }</pre>
             </div>
             <div class="flex flex-row gap-2 items-center">
               <img src="/game-icons/Xp.png" alt="xp" class="h-[16px] w-[16px]"/>
-              <pre>Xp:                 { $player.expPoints }</pre>
+              <pre>Xp:                  { $player.expPoints }</pre>
             </div>
 
             {#if $player["3vs3Victories"] !== undefined}
               <div class="flex flex-row gap-2 items-center">
                 <img src="/game-icons/3v3.png" alt="3v3" class="h-[16px] w-[16px]"/>
-                <pre>Win 3v3:            { $player["3vs3Victories"] }</pre>
+                <pre>Win 3v3:             { $player["3vs3Victories"] }</pre>
               </div>
             {/if}
             <div class="flex flex-row gap-2 items-center">
               <img src="/game-icons/Showdown.png" alt="solo showdown" class="h-[16px] w-[16px]"/>
-              <pre>Win solo sd:        { $player.soloVictories ?? 0 }</pre>
+              <pre>Win solo sd:         { $player.soloVictories ?? 0 }</pre>
             </div>
             <div class="flex flex-row gap-2 items-center">
               <img src="/game-icons/Duo-Showdown.png" alt="duo showdown" class="h-[16px] w-[16px]"/>
-              <pre>Win duo sd:         { $player.duoVictories ?? 0 }</pre>
+              <pre>Win duo sd:          { $player.duoVictories ?? 0 }</pre>
             </div>
+            <div class="flex flex-row gap-2 items-center">
+              <img src="/game-icons/Coins.png" alt="coin" class="h-[16px] w-[16px]"/>
+              <pre>monete a max:        { coinsToMax }</pre>
+            </div>
+            <div class="flex flex-row gap-2 items-center">
+              <img src="/game-icons/PowerPoint.png" alt="powerpoint" class="h-[16px] w-[16px]"/>
+              <pre>punti energia a max: { powerpointsToMax }</pre>
+            </div>  
           </div>
           {#if deviceInfo === 'Windows' || deviceInfo === 'macOS' || deviceInfo === 'Linux'}
             <img src="/decorations/colt-challenger.png" alt="colt challenger" class="h-[225px] w-auto"/>
           {/if}
           
         </div>
-        <div class="w-[86%] ml-[7%] mr-[7%] border border-gray-300 rounded-xl">
+        <div class="w-[86%] ml-[7%] mr-[7%] border border-gray-300 rounded-xl"> <!-- lista dei brawler + statistiche di ognuno se richieste -->
           <ul class="p-4">
             {#each Brawlers as b}
               {#if deviceInfo === 'Windows' || deviceInfo === 'macOS' || deviceInfo === 'Linux'}
@@ -305,6 +424,10 @@
                   <p>Massimo: {b.highestTrophies}</p>
                   <p>Power: {b.power}</p>
                   <p>Rank: {b.rank}</p>
+                  <p>Monete per livello 11: {calculateCoinsToMaxBrawler(b) == 0 ? "già al livello 11" : calculateCoinsToMaxBrawler(b)}</p>
+                  <p>Punti energia per livello 11: {calculatePowerpointsToMaxBrawler(b) == 0 ? "già al livello 11" : calculatePowerpointsToMaxBrawler(b)}</p>
+                  <p>Monete per buildarlo: {calculateCoinsToBuildBrawler(b) == 0 ? "già buildato" : calculateCoinsToBuildBrawler(b)}</p>
+                  <p>Monete per portarlo a full max: {calculateCoinsToFullMaxBrawler(b) == 0 ? "già al livello 11 con tutto" : calculateCoinsToFullMaxBrawler(b)}</p>
                   {#if b.gears?.length}
                     <div>Gears: {b.gears.map(g => `${g.name} ${g.level}`).join(", ")}</div>
                   {/if}
@@ -314,6 +437,7 @@
                   {#if b.gadgets?.length}
                     <div>Gadgets: {b.gadgets.map(g => g.name).join(", ")}</div>
                   {/if}
+
                 </li>
                 
               {/if}
@@ -322,7 +446,7 @@
         </div>
       </div>
     {/if}
-    {#if $club && $loaded == 'club'}
+    {#if $club && $loaded == 'club'} <!-- profilo club -->
       <div class="max-h-[86vh] border border-gray-300 rounded-xl p-4">
         <p>{ $club.name } <small> ({ $club.tag })</small></p>
         <p>descrizione: { $club.description }</p>
@@ -342,7 +466,7 @@
       </div>
     {/if}
   </div>
-  <footer class="bg-gray-900 h-[7vh] text-center flex items-center justify-center">
+  <footer class="bg-gray-900 h-[7vh] text-center flex items-center justify-center"> <!-- footer -->
     <p>Created by Zanga Alessandro</p>
   </footer>
 </div>
