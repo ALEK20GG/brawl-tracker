@@ -186,13 +186,66 @@
   }
 
   async function getProfileIconsFolderTauri(): Promise<string | null> {
-    if (typeof window === "undefined" || !(window as any).__TAURI_IPC__) return null;
+    if (deviceInfo == "Android" || deviceInfo == "iOS") 
+    {
+      console.warn("getProfileIconsFolderTauri: operazione non supportata su mobile");
+      return null;
+    }
     try {
       const path: string = await invoke("get_profileicons_path");
       return path;
     } catch (e) {
       console.warn("getProfileIconsFolderTauri:", e);
       return null;
+    }
+  }
+
+  async function getGadgetAssetsPath(): Promise<string | null> {
+    if (deviceInfo == "Android" || deviceInfo == "iOS") 
+    {
+      console.warn("getGadgetAssetsPath: operazione non supportata su mobile");
+      return null;
+    }
+    try {
+      const path: string = await invoke("get_gadget_assets_path");
+      return path;
+    } catch (e) {
+      console.warn("getGadgetAssetsPath:", e);
+      return null;
+    }
+  }
+
+  async function getStarPowerAssetsPath(): Promise<string | null> {
+    if (deviceInfo == "Android" || deviceInfo == "iOS") 
+    {
+      console.warn("getStarPowerAssetsPath: operazione non supportata su mobile");
+      return null;
+    }
+    try {
+      const path: string = await invoke("get_starpower_assets_path");
+      return path;
+    } catch (e) {
+      console.warn("getStarPowerAssetsPath:", e);
+      return null;
+    }
+  }
+
+  async function updateBrawlerAssetsTauri(brawler: string): Promise<boolean | null> {
+    // Non eseguire su mobile (usa invece il metodo capacitor se serve)
+    if (deviceInfo === "Android" || deviceInfo === "iOS") {
+      console.warn("updateBrawlerAssetsTauri: operazione non supportata su mobile");
+      return null;
+    }
+
+    try {
+      console.log(`Invocazione funzione rust: download assets per brawler "${brawler}"...`);
+      // nome del comando corrisponde alla funzione Rust: update_brawler_assets
+      await invoke("update_brawler_assets", { brawler });
+      console.log(`Download assets per "${brawler}" completato (invoke ok).`);
+      return true;
+    } catch (e) {
+      console.error("updateBrawlerAssetsTauri error:", e);
+      return false;
     }
   }
 
@@ -421,9 +474,22 @@
               {/if}
               {#if showedStats[Brawlers.indexOf(b)]}
                 <li class="bg-gray-800/50 rounded-lg p-2">
-                  <p>Massimo: {b.highestTrophies}</p>
-                  <p>Power: {b.power}</p>
-                  <p>Rank: {b.rank}</p>
+                  <div class="flex flex-row gap-1 items-center">
+                    <img src="/game-icons/trophy.png" alt="trofeo" class="h-[16px] w-[16px]">
+                    <p>Trofei: {b.trophies}</p>
+                  </div>
+                  <div class="flex flex-row gap-1 items-center">
+                    <img src="/game-icons/Ranking.png" alt="max" class="h-[16px] w-[16px]">
+                    <p>Trofei massimi: {b.highestTrophies}</p>
+                  </div>
+                  <div class="flex flex-row gap-1 items-center">
+                    <img src="/game-icons/League11.png" alt="info" class="h-[16px] w-[16px]">
+                    <p>Rank: {b.rank}</p>
+                  </div>
+                  <div class="flex flex-row gap-1 items-center">
+                    <img src="/game-icons/Info.png" alt="info" class="h-[16px] w-[16px]">
+                    <p>Livello:{b.power}</p>
+                  </div>
                   <p>Monete per livello 11: {calculateCoinsToMaxBrawler(b) == 0 ? "già al livello 11" : calculateCoinsToMaxBrawler(b)}</p>
                   <p>Punti energia per livello 11: {calculatePowerpointsToMaxBrawler(b) == 0 ? "già al livello 11" : calculatePowerpointsToMaxBrawler(b)}</p>
                   <p>Monete per buildarlo: {calculateCoinsToBuildBrawler(b) == 0 ? "già buildato" : calculateCoinsToBuildBrawler(b)}</p>
