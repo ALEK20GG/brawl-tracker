@@ -52,48 +52,65 @@ fn update_icons_tauri() {
 }
 
 #[tauri::command]
-fn update_brawler_assets(brawler: &str) {
+fn update_brawler_assets(asset_name: &str, asset_type: &str) {
     let client = reqwest::blocking::Client::new();
     let proj = directories::ProjectDirs::from("com", "HyperCoderX", "BrawlTracker").unwrap();
     let base_dir = proj.data_dir();
-
-    for asset_type in &["gadget", "starpower"] {
-        let out_dir = base_dir.join(asset_type);
-        std::fs::create_dir_all(&out_dir).unwrap();
-
-        for ordinal in 1..=2 { // Prova fino a 05; estendi se necessario
-            let file_name = format!(
-                "{}_{}_ {:02}.png",
-                brawler, asset_type, ordinal
-            );
-            let url = format!(
-                "https://laptopcat.github.io/bs-fankit-rehosted/game-assets/{}",
+    let out_dir = base_dir.join(asset_type);
+    std::fs::create_dir_all(&out_dir).unwrap();
+    let file_name = asset_name.to_lowercase()
+                              .replace(". ", "-")
+                              .replace(" ", "-")
+                              .replace(".", "-")
+                              .replace("'", "")
+                              .replace("!", "")
+                              .replace("%", "");
+    let url = format!(
+                "https://brawlace.com/assets/images/brawlstars/{}s/{}.png",
+                asset_type,
                 file_name
             );
+    let dest = out_dir.join(format!("{file_name}.png"));
+    if dest.exists() {
+        println!("Già presente: {}", file_name);
+        return;
+    }
 
-            let dest = out_dir.join(&file_name);
-            if dest.exists() { continue; }
 
-            if let Ok(head) = client.head(&url).send() {
-                if head.status().is_success() {
-                    if let Ok(resp) = client.get(&url).send() {
-                        if let Ok(bytes) = resp.bytes() {
-                            std::fs::write(&dest, &bytes).unwrap();
-                            println!("Scaricato: {}", file_name);
-                        }
-                    }
-                } else {
-                    println!("Non trovato: {}", file_name);
+    if let Ok(head) = client.head(&url).send() {
+        if head.status().is_success() {
+            if let Ok(resp) = client.get(&url).send() {
+                if let Ok(bytes) = resp.bytes() {
+                    std::fs::write(&dest, &bytes).unwrap();
+                    println!("Scaricato: {}", file_name);
                 }
             }
+        } else {
+            println!("Non trovato: {}", file_name);
         }
     }
+}
+#[tauri::command]
+fn write_json(data: String) {
+    let proj = directories::ProjectDirs::from("com", "HyperCoderX", "BrawlTracker").unwrap();
+    let base_dir = proj.data_dir();
+    let out_dir = base_dir.join("data");
+    std::fs::create_dir_all(&out_dir).unwrap();
+    let dest = out_dir.join("brawlerAssets.json");
+    std::fs::write(&dest, data).unwrap();
 }
 
 
 fn main() {
   Builder::default()
-    .invoke_handler(tauri::generate_handler![update_icons_tauri, get_profileicons_path])
+    .invoke_handler(tauri::generate_handler![
+      update_icons_tauri,
+      get_profileicons_path,
+      get_gadget_assets_path,
+      get_starpower_assets_path,
+      update_brawler_assets,
+      write_json
+      ])
     .setup(|_app| {
       async_runtime::spawn_blocking(|| update_icons_tauri());
       Ok(())

@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "Capability principale per la finestra main (consente accesso fs necessario)",
+  "windows": ["main"],
+
+  "permissions": [
+    "fs:allow-read-file",
+    "fs:allow-read-dir",
+    "fs:allow-write-file",
+    "fs:allow-remove",
+    "fs:allow-create",
+    "fs:allow-read",
+    "fs:allow-write"
+  ]
+}

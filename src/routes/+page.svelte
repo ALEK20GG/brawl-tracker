@@ -6,7 +6,8 @@
   import {  getDeviceInfo } from "$lib/device-info";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { readFile } from "@tauri-apps/plugin-fs";
+  import { readFile , writeFile, BaseDirectory} from "@tauri-apps/plugin-fs";
+  import { updateBrawlerAssetsMobile, getAssetBase64Mobile } from "$lib/gadget-sp-downloader";
 
   //////////// EFFETTI PER I PUNTINI DI CARICAMENTO ////////////
   let loadingMessage = "Stiamo accendendo il server ";
@@ -84,6 +85,13 @@
       powerpointsToMax += calculatePowerpointsToMaxBrawler(b);
     });
   }
+  
+  $: if ($player && $loaded === 'player') {
+    // Queste funzioni vengono chiamate automaticamente quando il player è caricato
+    updateAllOwnedBrawlerAssets();
+    cacheBrawlerAssets();
+  }
+
   function calculateCoinsToMaxBrawler(brawler: Brawler): number {
     const powerLevelCoinsCosts = [20, 35, 75, 140, 290, 480, 800, 1250, 1875, 2800, 0];
     let totalCoinCost = 0;
@@ -126,59 +134,102 @@
   }
 
   function calculateCoinsToFullMaxBrawler(brawler: Brawler): number {
-    const powerLevelPwerpointsCost = [20, 35, 75, 140, 290, 480, 800, 1250, 1875, 2800, 0];
-    const gadgetsCost = 1000;
-    const starPowersCost = 2000;
-    const gearsCost = 1000;
-    let totalCoinsCost = 0;
+      const powerLevelPwerpointsCost = [20, 35, 75, 140, 290, 480, 800, 1250, 1875, 2800, 0];
+      const gadgetsCost = 1000;
+      const starPowersCost = 2000;
+      const gearsCost = 1000;
+      let totalCoinsCost = 0;
 
-    for (let level = brawler.power; level <= 11; level++) {
-      totalCoinsCost += powerLevelPwerpointsCost[level - 1];
-    }
-    switch (brawler.gadgets?.length) {
-      case 0:
-        totalCoinsCost += gadgetsCost*2;
-        break;
-      case 1:
-        totalCoinsCost += gadgetsCost;
-        break;
-    }
-    switch (brawler.starPowers?.length) {
-      case 0:
-        totalCoinsCost += starPowersCost*2;
-        break;
-      case 1:
-        totalCoinsCost += starPowersCost;
-        break;
-    }
-    switch (brawler.gears?.length) {
-      case 0:
-        totalCoinsCost += gearsCost*5;
-        break;
-      case 1:
-        totalCoinsCost += gearsCost*4;
-        break;
-      case 2:
-        totalCoinsCost += gearsCost*3;
-        break;
-      case 3:
-        totalCoinsCost += gearsCost*2;
-        break;
-      case 4:
-        totalCoinsCost += gearsCost;
-        break;
-    }
-    return totalCoinsCost;
-}
+      for (let level = brawler.power; level <= 11; level++) {
+        totalCoinsCost += powerLevelPwerpointsCost[level - 1];
+      }
+      switch (brawler.gadgets?.length) {
+        case 0:
+          totalCoinsCost += gadgetsCost*2;
+          break;
+        case 1:
+          totalCoinsCost += gadgetsCost;
+          break;
+      }
+      switch (brawler.starPowers?.length) {
+        case 0:
+          totalCoinsCost += starPowersCost*2;
+          break;
+        case 1:
+          totalCoinsCost += starPowersCost;
+          break;
+      }
+      switch (brawler.gears?.length) {
+        case 0:
+          totalCoinsCost += gearsCost*5;
+          break;
+        case 1:
+          totalCoinsCost += gearsCost*4;
+          break;
+        case 2:
+          totalCoinsCost += gearsCost*3;
+          break;
+        case 3:
+          totalCoinsCost += gearsCost*2;
+          break;
+        case 4:
+          totalCoinsCost += gearsCost;
+          break;
+      }
+      return totalCoinsCost;
+  }
 
+  async function cacheBrawlerAssets() {
+    if (!$player) return;
+
+    const data: Record<string, any> = {};
+
+    for (const b of $player.brawlers) {
+      if (b.gadgets===undefined) continue;
+      if (b.starPowers===undefined) continue;
+      data[b.name] = {
+        gadget1: await resolveStarPowerOrGadgetSrc(b.gadgets[0].name, 'gadget'),
+        gadget2: await resolveStarPowerOrGadgetSrc(b.gadgets[1].name, 'gadget'),
+        starpower1: await resolveStarPowerOrGadgetSrc(b.starPowers[0].name, 'starpower'),
+        starpower2: await resolveStarPowerOrGadgetSrc(b.starPowers[1].name, 'starpower'),
+      };
+    }
+
+    try {
+      // Convert string to Uint8Array for Tauri v2
+      const jsonString = JSON.stringify(data);
+      
+      invoke('write_json', { data: jsonString }); // Chiamata a funzione Rust per scrivere il file
+      
+      console.log('Assets salvati su file JSON ✅');
+    } catch (e) {
+      console.error('Errore salvataggio JSON:', e);
+    }
+  }
+
+  // Update your uint8ToBase64 function if needed (this should work as-is):
   function uint8ToBase64(bytes: Uint8Array): string {
-    // trasformazione icone profilo in base64
+    // This function should still work in v2
     let binary = "";
     const chunk = 0x8000;
     for (let i = 0; i < bytes.length; i += chunk) {
       binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
     }
     return btoa(binary);
+  }
+
+  // Update getIconBase64TauriByPath for v2:
+  async function getIconBase64TauriByPath(fullPath: string): Promise<string | null> {
+    if (typeof window === "undefined" || !(window as any).__TAURI_IPC__) return null;
+    try {
+      // In Tauri v2, readFile returns Uint8Array directly
+      const bytes: Uint8Array = await readFile(fullPath);
+      const b64 = uint8ToBase64(bytes);
+      return `data:image/png;base64,${b64}`;
+    } catch (e) {
+      console.warn("getIconBase64TauriByPath error:", e);
+      return null;
+    }
   }
 
   function set_loaded(type: 'player' | 'club') {
@@ -230,7 +281,48 @@
     }
   }
 
-  async function updateBrawlerAssetsTauri(brawler: string): Promise<boolean | null> {
+  function updateAllOwnedBrawlerAssets() {
+    if (!$player) {
+      console.warn("Nessun giocatore caricato, impossibile aggiornare gli asset dei brawler.");
+      return;
+    }
+    $player.brawlers.forEach(async (b) => {
+      let result: boolean | undefined | null = false;
+      if (deviceInfo === "Android" || deviceInfo === "iOS") {
+        for (const gadget of b.gadgets || []) {
+          if (b.gadgets===undefined) continue;
+          result = await updateBrawlerAssetsMobile(b.gadgets[0].name.toLowerCase(), 'gadget');
+          result = await updateBrawlerAssetsMobile(b.gadgets[1].name.toLowerCase(), 'gadget');
+        }
+        for (const starpower of b.starPowers || []) {
+          if (b.starPowers===undefined) continue;
+          result = await updateBrawlerAssetsMobile(b.starPowers[0].name.toLowerCase(), 'starpower');
+          result = await updateBrawlerAssetsMobile(b.starPowers[1].name.toLowerCase(), 'starpower');
+        }
+      }
+      else
+      {
+        for (const gadget of b.gadgets || []) {
+          if (b.gadgets===undefined) continue;
+          result = await updateBrawlerAssetsTauri(b.gadgets[0].name.toLowerCase(), 'gadget');
+          result = await updateBrawlerAssetsTauri(b.gadgets[1].name.toLowerCase(), 'gadget');
+        }
+        for (const starpower of b.starPowers || []) {
+          if (b.starPowers===undefined) continue;
+          result = await updateBrawlerAssetsTauri(b.starPowers[0].name.toLowerCase(), 'starpower');
+          result = await updateBrawlerAssetsTauri(b.starPowers[1].name.toLowerCase(), 'starpower');
+        }
+      }
+      
+      if (result === true) {
+        console.log(`Assets per il brawler "${b.name}" aggiornati con successo.`);
+      } else if (result === false) {
+        console.error(`Errore durante l'aggiornamento degli assets per il brawler "${b.name}".`);
+      }
+    });
+  }
+
+  async function updateBrawlerAssetsTauri(assetName: string, assetType: string): Promise<boolean | null> {
     // Non eseguire su mobile (usa invece il metodo capacitor se serve)
     if (deviceInfo === "Android" || deviceInfo === "iOS") {
       console.warn("updateBrawlerAssetsTauri: operazione non supportata su mobile");
@@ -238,10 +330,10 @@
     }
 
     try {
-      console.log(`Invocazione funzione rust: download assets per brawler "${brawler}"...`);
+      console.log(`Invocazione funzione rust: download assets per brawler "${assetName}"...`);
       // nome del comando corrisponde alla funzione Rust: update_brawler_assets
-      await invoke("update_brawler_assets", { brawler });
-      console.log(`Download assets per "${brawler}" completato (invoke ok).`);
+      await invoke("update_brawler_assets", { assetName, assetType });
+      console.log(`Download assets per "${assetName}" completato (invoke ok).`);
       return true;
     } catch (e) {
       console.error("updateBrawlerAssetsTauri error:", e);
@@ -249,16 +341,59 @@
     }
   }
 
-  async function getIconBase64TauriByPath(fullPath: string): Promise<string | null> {
-    if (typeof window === "undefined" || !(window as any).__TAURI_IPC__) return null;
+  async function getStarPowerOrGadgetBase64TauriByPath(fullPath: string): Promise<string | null> {
+    if (deviceInfo === "Android" || deviceInfo === "iOS") return null;
     try {
       const bytes: Uint8Array = await readFile(fullPath);
       const b64 = uint8ToBase64(bytes);
       return `data:image/png;base64,${b64}`;
     } catch (e) {
-      console.warn("getIconBase64TauriByPath error:", e);
+      console.warn("getStarPowerOrGadgetBase64TauriByPath error:", e);
       return null;
     }
+  }
+
+    async function resolveStarPowerOrGadgetSrc(
+    assetName: string,
+    assetType: 'gadget' | 'starpower'
+  ): Promise<string> {
+    const fallbackBase64 =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/w8AAn0B9pibuuUAAAAASUVORK5CYII=";
+
+    try {
+      if (deviceInfo === 'Android' || deviceInfo === 'iOS') {
+        const base64 = await getAssetBase64Mobile(assetType, assetName);
+        return base64 ?? fallbackBase64; // 🔹 forzatura fallback
+      }
+
+      if (deviceInfo === 'macOS' || deviceInfo === 'Windows' || deviceInfo === 'Linux') {
+        let folder: string | null = null;
+        if (assetType === 'gadget') {
+          folder = await getGadgetAssetsPath();
+        } else if (assetType === 'starpower') {
+          folder = await getStarPowerAssetsPath();
+        }
+
+        if (folder) {
+          const normalizedFolder = folder.replace(/[\\/]+$/, "");
+          const asset_name = `${assetName.toLowerCase()
+                          .replace(". ", "-")
+                          .replace(" ", "-")
+                          .replace(".", "-")
+                          .replace("'", "")
+                          .replace("!", "")
+                          .replace("%", "")}.png`;
+          const fullPath = `${normalizedFolder}/${asset_name}`;
+
+          const base64 = await getStarPowerOrGadgetBase64TauriByPath(fullPath);
+          return base64 ?? fallbackBase64; // 🔹 forzatura fallback
+        }
+      }
+    } catch (e) {
+      console.warn("Errore risolvendo asset:", e);
+    }
+
+    return fallbackBase64; // 🔹 fallback finale
   }
 
   // ---- Risolutore unico per la src dell'icona (Tauri / Capacitor / Web) ----
