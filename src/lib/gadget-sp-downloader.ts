@@ -48,12 +48,12 @@ export async function updateBrawlerAssetsMobile(
   const url = `https://brawlace.com/assets/images/brawlstars/
               ${assetType}s/
               ${assetName.toLowerCase()
-                          .replace(". ", "-")
-                          .replace(" ", "-")
-                          .replace(".", "-")
-                          .replace("'", "")
-                          .replace("!", "")
-                          .replace("%", "")}.png`;
+                         .replace("\. \g", "-")
+                         .replace("\ \g", "-")
+                         .replace("\.\g", "-")
+                         .replace("\'\g", "")
+                         .replace("\!\g", "")
+                         .replace("\%\g", "")}.png`;
   try {
     const response = await fetch(url);
     const blob = await response.blob();

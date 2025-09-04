@@ -38,9 +38,6 @@
     "opener": {
       "openExternal": true
     },
-    "fs": {
-      "all": true
-    },
     "http": {
       "all": true
     }

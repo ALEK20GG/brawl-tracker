@@ -4,6 +4,7 @@ use tauri::{Builder, async_runtime};
 use reqwest::blocking::Client;
 use directories::ProjectDirs;
 use std::{fs, io::Write};
+use tauri_plugin_fs::FsExt;
 
 const MIN_ID: u32 = 28_000_000;
 const MAX_ID: u32 = 28_001_000;
@@ -103,6 +104,7 @@ fn write_json(data: String) {
 
 fn main() {
   Builder::default()
+    .plugin(tauri_plugin_fs::init())
     .invoke_handler(tauri::generate_handler![
       update_icons_tauri,
       get_profileicons_path,
@@ -110,11 +112,23 @@ fn main() {
       get_starpower_assets_path,
       update_brawler_assets,
       write_json
-      ])
-    .setup(|_app| {
-      async_runtime::spawn_blocking(|| update_icons_tauri());
-      Ok(())
-    })
+    ])
+    .setup(|app| {
+          let proj = ProjectDirs::from("com", "HyperCoderX", "BrawlTracker").unwrap();
+          let base_dir = proj.data_dir();
+
+          // Concedi accesso al plugin fs
+          let scope = app.fs_scope();
+          scope.allow_directory(base_dir.join("profileicons"), false);
+          scope.allow_directory(base_dir.join("gadget"), false);
+          scope.allow_directory(base_dir.join("starpower"), false);
+          scope.allow_directory(base_dir.join("data"), false);
+
+          // Avvia il download degli icons in background
+          async_runtime::spawn_blocking(|| update_icons_tauri());
+
+          Ok(())
+      })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

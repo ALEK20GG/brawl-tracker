@@ -353,10 +353,10 @@
     }
   }
 
-    async function resolveStarPowerOrGadgetSrc(
-    assetName: string,
-    assetType: 'gadget' | 'starpower'
-  ): Promise<string> {
+  async function resolveStarPowerOrGadgetSrc(
+      assetName: string,
+      assetType: 'gadget' | 'starpower'
+    ): Promise<string> {
     const fallbackBase64 =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/w8AAn0B9pibuuUAAAAASUVORK5CYII=";
 
@@ -376,13 +376,12 @@
 
         if (folder) {
           const normalizedFolder = folder.replace(/[\\/]+$/, "");
-          const asset_name = `${assetName.toLowerCase()
-                          .replace(". ", "-")
-                          .replace(" ", "-")
-                          .replace(".", "-")
-                          .replace("'", "")
-                          .replace("!", "")
-                          .replace("%", "")}.png`;
+          const asset_name = `${assetName
+                          .toLowerCase()
+                          .replace(/\. /g, "-")
+                          .replace(/[\s.]/g, "-")
+                          .replace(/['!%]/g, "")}.png`;
+                          console.log("Normalized asset name:", asset_name);
           const fullPath = `${normalizedFolder}/${asset_name}`;
 
           const base64 = await getStarPowerOrGadgetBase64TauriByPath(fullPath);
